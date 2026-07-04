@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { promoteApplicantToStaff, type PromoteApplicantState } from "./actions";
 
 export function PromoteToStaffForm({
@@ -25,9 +26,12 @@ export function PromoteToStaffForm({
           They sign in at <span className="font-medium">/staff/login</span> with{" "}
           <span className="font-medium">{state.email}</span> and this temporary password:
         </p>
-        <p className="mt-2 rounded-md bg-white px-3 py-2 font-mono text-base font-semibold text-slate-900 ring-1 ring-inset ring-emerald-600/20">
-          {state.tempPassword}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <code className="rounded-md bg-white px-3 py-2 font-mono text-base font-semibold text-slate-900 ring-1 ring-inset ring-emerald-600/20">
+            {state.tempPassword}
+          </code>
+          <CopyButton value={state.tempPassword} />
+        </div>
         <p className="mt-2 text-xs text-emerald-700">
           Shown only once — share it securely and have them change it at /staff/account after
           first sign-in.

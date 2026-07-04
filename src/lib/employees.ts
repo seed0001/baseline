@@ -84,6 +84,42 @@ export async function createEmployee(input: {
   }
 }
 
+export async function setEmployeePassword(input: {
+  id: string;
+  password: string;
+  actorId: string;
+}) {
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    const updated = await client.query(
+      `
+        UPDATE employees
+        SET password_hash = $2, failed_login_attempts = 0, locked_until = NULL, updated_at = NOW()
+        WHERE id = $1
+      `,
+      [input.id, await bcrypt.hash(input.password, 12)],
+    );
+    if (!updated.rowCount) throw new Error("Employee not found.");
+    await client.query("DELETE FROM employee_sessions WHERE employee_id = $1", [input.id]);
+    await client.query(
+      `
+        INSERT INTO employee_audit_log (
+          actor_employee_id, action, subject_type, subject_id
+        )
+        VALUES ($1, 'employee.password_reset', 'employee', $2)
+      `,
+      [input.actorId, input.id],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function updateEmployee(input: {
   id: string;
   role: EmployeeRole;

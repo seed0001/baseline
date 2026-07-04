@@ -7,6 +7,7 @@ import {
   rolePermissions,
 } from "@/lib/permissions";
 import { createEmployeeAccount, updateEmployeeAccount } from "./actions";
+import { ResetPasswordButton } from "./reset-password";
 
 export const metadata = { title: "Employee Access — Baseline Operations" };
 export const dynamic = "force-dynamic";
@@ -87,6 +88,9 @@ export default async function EmployeesPage() {
                     Save access
                   </button>
                 </form>
+              )}
+              {canManage && employee.id !== current.id && (
+                <ResetPasswordButton employeeId={employee.id} />
               )}
             </div>
           ))}

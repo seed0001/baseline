@@ -1,9 +1,15 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireEmployee } from "@/lib/employee-auth";
-import { createEmployee, getEmployee, updateEmployee } from "@/lib/employees";
+import {
+  createEmployee,
+  getEmployee,
+  setEmployeePassword,
+  updateEmployee,
+} from "@/lib/employees";
 import { employeeRoles } from "@/lib/permissions";
 
 const createSchema = z.object({
@@ -63,4 +69,35 @@ export async function updateEmployeeAccount(formData: FormData) {
 
   await updateEmployee({ ...parsed.data, id: parsed.data.employeeId, actorId: actor.id });
   revalidatePath("/admin/employees");
+}
+
+export type ResetPasswordState =
+  | { status: "success"; email: string; tempPassword: string }
+  | { status: "error"; message: string }
+  | null;
+
+export async function resetEmployeePassword(
+  _prevState: ResetPasswordState,
+  formData: FormData,
+): Promise<ResetPasswordState> {
+  const actor = await requireEmployee("employees.manage");
+  const employeeId = z.string().uuid().safeParse(formData.get("employeeId"));
+  if (!employeeId.success) return { status: "error", message: "Invalid employee." };
+
+  const target = await getEmployee(employeeId.data);
+  if (!target) return { status: "error", message: "Employee not found." };
+  if (target.role === "owner" && actor.role !== "owner") {
+    return { status: "error", message: "Only an owner can reset an owner's password." };
+  }
+  if (target.id === actor.id) {
+    return {
+      status: "error",
+      message: "Use /staff/account to change your own password.",
+    };
+  }
+
+  const tempPassword = randomBytes(12).toString("base64url");
+  await setEmployeePassword({ id: target.id, password: tempPassword, actorId: actor.id });
+  revalidatePath("/admin/employees");
+  return { status: "success", email: target.email, tempPassword };
 }
