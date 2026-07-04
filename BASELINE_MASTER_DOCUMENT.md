@@ -45,7 +45,7 @@ you.* The promise to the provider: *pre-scoped, pre-funded jobs with no bidding 
 
 ### The catalog (company-owned)
 
-- ~28 services across 14 categories at launch, each a **ServiceTemplate** defining: name, category,
+- 41 services across 14 categories at launch, each a **ServiceTemplate** defining: name, category,
   description, baseline price + unit (flat / per axle / per person / per month / starting at),
   estimated duration, required skill level (Entry → Intermediate → Licensed Pro → Specialist),
   photo/measurement requirements, and the exact information a customer must provide.
@@ -184,7 +184,7 @@ Production tables (see `db/migrations/`): `pricing_catalog`, `pricing_source_che
   estimate ranges, proposal views (small job, remodel, software build), customer dashboard,
   project detail with milestones/tasks/payments/activity, provider application + portal, custom
   request flow, pricing methodology page with cited sources.
-- Researched pricing for all 27 priced services (verified 2026-07-03) with published ranges and
+- Researched pricing for all 41 priced services (latest additions verified 2026-07-04) with published ranges and
   source links.
 - Production pricing pipeline (Postgres-backed, auditable publication).
 - Provider application intake with reference numbers, operator review queue, status pipeline with
