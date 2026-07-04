@@ -1,0 +1,15 @@
+{
+  "serviceId": "svc-101",
+  "baselinePrice": 425,
+  "priceUnit": "flat",
+  "marketRange": "$375 – $800 installed (labor $150 – $400)",
+  "priceBasis": "Midpoint of current installed averages for a standard two-piece unit.",
+  "sources": [
+    {
+      "label": "Angi — Toilet Installation Cost",
+      "url": "https://www.angi.com/articles/how-much-does-toilet-installation-cost.htm"
+    }
+  ],
+  "lastVerified": "2026-07-03",
+  "publishedBy": "catalog-reviewer"
+}
