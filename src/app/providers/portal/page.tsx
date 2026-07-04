@@ -6,18 +6,20 @@ import {
 } from "@/lib/provider-workspace";
 import { ProviderWorkspace } from "./provider-workspace";
 import { getPersonaHistories, listProviderPersonas } from "@/lib/provider-personas";
+import { listProviderMemories } from "@/lib/provider-memory";
 
 export const metadata = { title: "Provider Workspace — Baseline" };
 export const dynamic = "force-dynamic";
 
 export default async function ProviderPortalPage() {
   const provider = await requireProvider();
-  const [services, tools, activity, personas, histories] = await Promise.all([
+  const [services, tools, activity, personas, histories, memories] = await Promise.all([
     listProviderServices(provider.id),
     listProviderTools(provider.id),
     listProviderActivity(provider.id),
     listProviderPersonas(provider.id),
     getPersonaHistories(provider.id),
+    listProviderMemories(provider.id),
   ]);
 
   return (
@@ -28,6 +30,7 @@ export default async function ProviderPortalPage() {
       activity={activity}
       personas={personas}
       initialHistories={histories}
+      memories={memories}
     />
   );
 }

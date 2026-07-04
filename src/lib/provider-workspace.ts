@@ -97,6 +97,18 @@ export async function listProviderActivity(providerId: string): Promise<Provider
   }));
 }
 
+export async function recordProviderActivity(
+  providerId: string,
+  action: string,
+  subject: string,
+  detail: string,
+) {
+  await pool().query(
+    "INSERT INTO provider_activity (provider_account_id, action, subject, detail) VALUES ($1,$2,$3,$4)",
+    [providerId, action, subject, detail],
+  );
+}
+
 export async function saveProviderService(
   providerId: string,
   service: Omit<ProviderService, "id" | "updatedAt"> & { id?: string },
@@ -124,9 +136,11 @@ export async function saveProviderService(
     ],
   );
   if (!result.rowCount) throw new Error("Service not found.");
-  await pool().query(
-    "INSERT INTO provider_activity (provider_account_id, action, subject, detail) VALUES ($1,$2,$3,$4)",
-    [providerId, service.status === "published" ? "Published service" : "Saved draft", service.name, "Catalog updated"],
+  await recordProviderActivity(
+    providerId,
+    service.status === "published" ? "Published service" : "Saved draft",
+    service.name,
+    "Catalog updated",
   );
   return mapService(result.rows[0]);
 }

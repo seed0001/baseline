@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import type { ProviderActivity, ProviderService, ProviderTool } from "@/lib/provider-workspace";
 import type { ChatMessage } from "@/lib/ai";
 import type { ProviderPersona, ProviderPersonaKey } from "@/lib/provider-personas";
+import type { ProviderMemory } from "@/lib/provider-memory-types";
 import { signOutProvider } from "./actions";
 import { saveCatalogService } from "./workspace-actions";
 import { ProviderAiTeam } from "./provider-ai-team";
@@ -23,6 +24,7 @@ export function ProviderWorkspace({
   activity,
   personas,
   initialHistories,
+  memories,
 }: {
   businessName: string;
   services: ProviderService[];
@@ -30,6 +32,7 @@ export function ProviderWorkspace({
   activity: ProviderActivity[];
   personas: ProviderPersona[];
   initialHistories: Record<ProviderPersonaKey, ChatMessage[]>;
+  memories: ProviderMemory[];
 }) {
   const [tab, setTab] = useState<Tab>("home");
   const [services, setServices] = useState(initialServices);
@@ -103,6 +106,7 @@ export function ProviderWorkspace({
             <ProviderAiTeam
               initialPersonas={personas}
               initialHistories={initialHistories}
+              initialMemories={memories}
               onDraft={(generated) => {
                 setDraft(generated);
                 setNotice("AI draft ready. Review the structured details before saving.");

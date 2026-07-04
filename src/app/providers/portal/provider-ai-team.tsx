@@ -4,11 +4,14 @@ import { useState, useTransition } from "react";
 import type { ChatMessage } from "@/lib/ai";
 import type { ProviderPersona, ProviderPersonaKey } from "@/lib/provider-personas";
 import type { ProviderService } from "@/lib/provider-workspace";
+import type { ProviderMemory } from "@/lib/provider-memory-types";
 import {
+  clearPersonaChat,
   generateCatalogDraft,
   sendPersonaMessage,
   updatePersonaSettings,
 } from "./workspace-actions";
+import { ProviderMemoryManager } from "./provider-memory-manager";
 
 type ServiceDraft = Omit<ProviderService, "id" | "updatedAt"> & { id?: string };
 type Mode = "chat" | "build";
@@ -29,25 +32,47 @@ type VoiceWindow = Window & {
 export function ProviderAiTeam({
   initialPersonas,
   initialHistories,
+  initialMemories,
   initialMode = "chat",
   onDraft,
 }: {
   initialPersonas: ProviderPersona[];
   initialHistories: Record<ProviderPersonaKey, ChatMessage[]>;
+  initialMemories: ProviderMemory[];
   initialMode?: Mode;
   onDraft: (draft: ServiceDraft) => void;
 }) {
   const [personas, setPersonas] = useState(initialPersonas);
   const [histories, setHistories] = useState(initialHistories);
+  const [memories, setMemories] = useState(initialMemories);
   const [selectedKey, setSelectedKey] = useState<ProviderPersonaKey>("manager");
   const [mode, setMode] = useState<Mode>(initialMode);
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("");
   const [listening, setListening] = useState(false);
   const [editing, setEditing] = useState<ProviderPersona | null>(null);
+  const [managingMemory, setManagingMemory] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [pending, startTransition] = useTransition();
   const persona = personas.find((item) => item.key === selectedKey) ?? personas[0];
   const messages = histories[selectedKey] ?? [];
+
+  function clearChat() {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    setConfirmClear(false);
+    startTransition(async () => {
+      const result = await clearPersonaChat(selectedKey);
+      if (result.ok) {
+        setHistories((current) => ({ ...current, [selectedKey]: [] }));
+        setNotice(`Your conversation with ${persona.displayName} was cleared.`);
+      } else {
+        setNotice(result.error);
+      }
+    });
+  }
 
   function listen() {
     const voiceWindow = window as VoiceWindow;
@@ -114,15 +139,20 @@ export function ProviderAiTeam({
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Your AI team</p>
             <h2 className="mt-0.5 text-lg font-semibold text-slate-950">Who do you want to work with?</h2>
           </div>
-          <button onClick={() => setEditing(persona)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            Adjust persona
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button onClick={() => setManagingMemory(true)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Memory
+            </button>
+            <button onClick={() => setEditing(persona)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Adjust persona
+            </button>
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
           {personas.map((item) => (
             <button
               key={item.key}
-              onClick={() => { setSelectedKey(item.key); setMode("chat"); setNotice(""); }}
+              onClick={() => { setSelectedKey(item.key); setMode("chat"); setNotice(""); setConfirmClear(false); }}
               className={`rounded-xl border p-2.5 text-left transition ${selectedKey === item.key ? "border-teal-600 bg-teal-50 ring-1 ring-teal-600" : "border-slate-200 hover:border-slate-300"}`}
             >
               <div className="flex items-center gap-2">
@@ -141,9 +171,20 @@ export function ProviderAiTeam({
             <p className="font-semibold">{persona.displayName}</p>
             <p className="mt-0.5 text-xs text-teal-100">{persona.title}</p>
           </div>
-          <div className="flex rounded-xl bg-black/15 p-1 text-xs font-semibold">
-            <button onClick={() => setMode("chat")} className={`rounded-lg px-3 py-1.5 ${mode === "chat" ? "bg-white text-teal-900" : "text-teal-50"}`}>Conversation</button>
-            <button onClick={() => setMode("build")} className={`rounded-lg px-3 py-1.5 ${mode === "build" ? "bg-white text-teal-900" : "text-teal-50"}`}>Build service</button>
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex rounded-xl bg-black/15 p-1 text-xs font-semibold">
+              <button onClick={() => setMode("chat")} className={`rounded-lg px-3 py-1.5 ${mode === "chat" ? "bg-white text-teal-900" : "text-teal-50"}`}>Conversation</button>
+              <button onClick={() => setMode("build")} className={`rounded-lg px-3 py-1.5 ${mode === "build" ? "bg-white text-teal-900" : "text-teal-50"}`}>Build service</button>
+            </div>
+            {mode === "chat" && messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                disabled={pending}
+                className={`text-[11px] font-semibold underline-offset-2 hover:underline ${confirmClear ? "text-red-200" : "text-teal-100"}`}
+              >
+                {confirmClear ? (pending ? "Clearing…" : "Delete this conversation?") : "Clear chat"}
+              </button>
+            )}
           </div>
         </div>
         <div className="max-h-80 min-h-44 space-y-2.5 overflow-y-auto bg-slate-50 p-3 sm:p-4">
@@ -185,6 +226,14 @@ export function ProviderAiTeam({
         </div>
         <p className="px-4 py-2 text-[11px] text-teal-100 sm:px-5">Conversation is separate from actions. Nothing is published or sent without approval.</p>
       </section>
+
+      {managingMemory && (
+        <ProviderMemoryManager
+          memories={memories}
+          onChange={setMemories}
+          onClose={() => setManagingMemory(false)}
+        />
+      )}
 
       {editing && (
         <PersonaEditor

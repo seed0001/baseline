@@ -64,6 +64,23 @@ export async function getConversationHistory(
     .map((row) => ({ role: row.role as ChatMessage["role"], content: String(row.content) }));
 }
 
+export async function clearConversation(audience: AiAudience, subjectId: string) {
+  try {
+    await pool().query(
+      `
+        DELETE FROM ai_messages
+        WHERE conversation_id IN (
+          SELECT id FROM ai_conversations WHERE audience = $1 AND subject_id = $2
+        )
+      `,
+      [audience, subjectId],
+    );
+  } catch (error) {
+    if ((error as { code?: string }).code === "42P01") return;
+    throw error;
+  }
+}
+
 async function ensureConversation(audience: AiAudience, subjectId: string) {
   const existing = await pool().query(
     "SELECT id FROM ai_conversations WHERE audience = $1 AND subject_id = $2",

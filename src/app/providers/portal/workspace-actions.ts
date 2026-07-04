@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireProvider } from "@/lib/provider-auth";
-import { saveProviderService, type ProviderService } from "@/lib/provider-workspace";
-import { askAssistant } from "@/lib/ai";
+import {
+  recordProviderActivity,
+  saveProviderService,
+  type ProviderService,
+} from "@/lib/provider-workspace";
+import { askAssistant, clearConversation } from "@/lib/ai";
 import { getCatalogServices } from "@/lib/catalog";
 import {
   getProviderMemoryContext,
@@ -15,6 +19,14 @@ import {
   saveProviderPersona,
   type ProviderPersonaKey,
 } from "@/lib/provider-personas";
+import {
+  clearProviderMemories,
+  createProviderMemory,
+  deleteProviderMemory,
+  providerMemoryCategories,
+  updateProviderMemory,
+  type ProviderMemory,
+} from "@/lib/provider-memory";
 
 const serviceSchema = z.object({
   id: z.string().uuid().optional(),
@@ -129,5 +141,109 @@ export async function updatePersonaSettings(input: unknown) {
   } catch (error) {
     console.error("Provider persona settings failed", error);
     return { ok: false as const, error: "The persona settings could not be saved." };
+  }
+}
+
+export type WorkspaceActionResult = { ok: true } | { ok: false; error: string };
+
+export async function clearPersonaChat(
+  personaKey: ProviderPersonaKey,
+): Promise<WorkspaceActionResult> {
+  const provider = await requireProvider();
+  try {
+    const key = personaKeySchema.parse(personaKey);
+    const personas = await listProviderPersonas(provider.id);
+    const persona = personas.find((item) => item.key === key) ?? providerPersonaDefaults[key];
+    await clearConversation("provider", personaSubjectId(provider.id, key));
+    await recordProviderActivity(
+      provider.id,
+      "Cleared AI conversation",
+      persona.displayName,
+      "Chat history deleted at your request",
+    );
+    revalidatePath("/providers/portal");
+    return { ok: true };
+  } catch (error) {
+    console.error("Provider chat clear failed", error);
+    return { ok: false, error: "The conversation could not be cleared. Please try again." };
+  }
+}
+
+const memorySchema = z.object({
+  id: z.string().regex(/^\d+$/).optional(),
+  category: z.enum(providerMemoryCategories),
+  content: z.string().trim().min(2).max(600),
+  pinned: z.boolean(),
+});
+
+export type MemorySaveResult =
+  | { ok: true; memory: ProviderMemory }
+  | { ok: false; error: string };
+
+export async function saveMemory(input: unknown): Promise<MemorySaveResult> {
+  const provider = await requireProvider();
+  let parsed;
+  try {
+    parsed = memorySchema.parse(input);
+  } catch {
+    return { ok: false, error: "Review the memory details and try again." };
+  }
+  try {
+    const memory = parsed.id
+      ? await updateProviderMemory(provider.id, parsed.id, parsed)
+      : await createProviderMemory(provider.id, parsed);
+    await recordProviderActivity(
+      provider.id,
+      parsed.id ? "Updated AI memory" : "Added AI memory",
+      parsed.category,
+      parsed.content.length > 80 ? `${parsed.content.slice(0, 80)}…` : parsed.content,
+    );
+    revalidatePath("/providers/portal");
+    return { ok: true, memory };
+  } catch (error) {
+    console.error("Provider memory save failed", error);
+    return {
+      ok: false,
+      error: error instanceof Error && error.message.includes("Memory is full")
+        ? error.message
+        : "The memory could not be saved. Please try again.",
+    };
+  }
+}
+
+export async function removeMemory(memoryId: string): Promise<WorkspaceActionResult> {
+  const provider = await requireProvider();
+  try {
+    const id = z.string().regex(/^\d+$/).parse(memoryId);
+    await deleteProviderMemory(provider.id, id);
+    await recordProviderActivity(
+      provider.id,
+      "Deleted AI memory",
+      "Long-term memory",
+      "One memory removed at your request",
+    );
+    revalidatePath("/providers/portal");
+    return { ok: true };
+  } catch (error) {
+    console.error("Provider memory delete failed", error);
+    return { ok: false, error: "The memory could not be deleted. Please try again." };
+  }
+}
+
+export async function removeAllMemories(): Promise<WorkspaceActionResult> {
+  const provider = await requireProvider();
+  try {
+    const removed = await clearProviderMemories(provider.id);
+    await recordProviderActivity(
+      provider.id,
+      "Cleared AI memory",
+      "Long-term memory",
+      `${removed} memories removed at your request`,
+    );
+    revalidatePath("/providers/portal");
+    return { ok: true };
+  } catch (error) {
+    console.error("Provider memory clear failed", error);
+    return { ok: false, error: "The memories could not be deleted. Please try again." };
   }
 }
