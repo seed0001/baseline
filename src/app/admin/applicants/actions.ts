@@ -7,6 +7,10 @@ import { requireEmployee } from "@/lib/employee-auth";
 import { createEmployee } from "@/lib/employees";
 import { employeeRoles, roleLabels } from "@/lib/permissions";
 import {
+  createProviderAccount,
+  resetProviderAccountPassword,
+} from "@/lib/provider-accounts";
+import {
   getProviderApplication,
   providerApplicationStatuses,
   recordProviderApplicationEvent,
@@ -97,4 +101,61 @@ export async function promoteApplicantToStaff(
     tempPassword,
     roleLabel: roleLabels[parsed.data.role],
   };
+}
+
+export type ProviderAccountState =
+  | { status: "success"; email: string; tempPassword: string; action: "created" | "reset" }
+  | { status: "error"; message: string }
+  | null;
+
+export async function createProviderPortalAccount(
+  _prevState: ProviderAccountState,
+  formData: FormData,
+): Promise<ProviderAccountState> {
+  const actor = await requireEmployee("providers.manage");
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { status: "error", message: "Invalid application." };
+
+  const application = await getProviderApplication(applicationId.data);
+  if (!application) return { status: "error", message: "Application not found." };
+
+  const tempPassword = randomBytes(12).toString("base64url");
+  try {
+    const account = await createProviderAccount({
+      applicationId: application.id,
+      password: tempPassword,
+      actor: `${actor.fullName} (${actor.id})`,
+    });
+    revalidatePath("/admin/applicants");
+    return { status: "success", email: account.email, tempPassword, action: "created" };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+      return {
+        status: "error",
+        message: "A portal account already exists for this application or email.",
+      };
+    }
+    throw error;
+  }
+}
+
+export async function resetProviderPortalPassword(
+  _prevState: ProviderAccountState,
+  formData: FormData,
+): Promise<ProviderAccountState> {
+  const actor = await requireEmployee("providers.manage");
+  const applicationId = z.string().uuid().safeParse(formData.get("applicationId"));
+  if (!applicationId.success) return { status: "error", message: "Invalid application." };
+
+  const tempPassword = randomBytes(12).toString("base64url");
+  try {
+    const account = await resetProviderAccountPassword({
+      applicationId: applicationId.data,
+      password: tempPassword,
+      actor: `${actor.fullName} (${actor.id})`,
+    });
+    return { status: "success", email: account.email, tempPassword, action: "reset" };
+  } catch {
+    return { status: "error", message: "No portal account exists for this application yet." };
+  }
 }

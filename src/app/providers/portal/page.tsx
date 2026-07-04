@@ -1,62 +1,77 @@
-import { services, formatCurrency } from "@/lib/data";
+import { formatCurrency } from "@/lib/data";
+import { getCatalogServices } from "@/lib/catalog";
+import { requireProvider } from "@/lib/provider-auth";
+import { listProviderQualifications } from "@/lib/provider-accounts";
+import type { ProviderApplicationStatus } from "@/lib/provider-applications";
 import { Badge, PageHeader, StatCard } from "@/components/ui";
-import { ServiceOptIn } from "./service-opt-in";
+import { requestQualification, signOutProvider, withdrawQualification } from "./actions";
 
 export const metadata = {
   title: "Provider Portal — Baseline",
 };
 
-const invitations = [
-  {
-    id: "JOB-8841",
-    service: "Water Heater Replacement (40–50 gal)",
-    location: "Pflugerville, TX 78660",
-    date: "2026-07-07",
-    payout: 920,
-    urgency: "Priority",
-    note: "Gas unit in garage, straightforward access. Photos on file.",
-  },
-  {
-    id: "JOB-8836",
-    service: "Replace Toilet",
-    location: "Austin, TX 78745",
-    date: "2026-07-05",
-    payout: 260,
-    urgency: "Standard",
-    note: "Customer-supplied Kohler unit. Second-floor bathroom.",
-  },
-  {
-    id: "JOB-8829",
-    service: "Replace Toilet",
-    location: "Round Rock, TX 78664",
-    date: "2026-07-08",
-    payout: 260,
-    urgency: "Standard",
-    note: "Flange condition unknown — inspection line item pre-approved.",
-  },
-];
+export const dynamic = "force-dynamic";
 
-const payouts = [
-  { label: "PRJ-2041 · Phase 2 — Demolition assist", date: "2026-06-26", amount: 740, status: "Paid" },
-  { label: "PRJ-2033 · Toilet Replacement", date: "2026-05-16", amount: 272, status: "Paid" },
-  { label: "PRJ-2041 · Phase 3 — Rough plumbing", date: "Pending approval", amount: 1480, status: "In Escrow" },
-];
+const screeningLabels: Record<ProviderApplicationStatus, string> = {
+  new: "Submitted",
+  under_review: "Under Review",
+  information_requested: "Information Requested",
+  credentials: "Credentials Review",
+  background_check: "Background Check",
+  skill_review: "Skill Review",
+  approved: "Approved",
+  declined: "Declined",
+  withdrawn: "Withdrawn",
+};
 
-export default function ProviderPortalPage() {
-  const qualifiedIds = ["svc-101", "svc-102"];
+export default async function ProviderPortalPage() {
+  const provider = await requireProvider();
+  const [services, qualifications] = await Promise.all([
+    getCatalogServices(),
+    listProviderQualifications(provider.id),
+  ]);
+
+  const qualificationByService = new Map(qualifications.map((q) => [q.serviceId, q.status]));
+  const qualifiedCount = qualifications.filter((q) => q.status === "qualified").length;
+  const pendingCount = qualifications.filter((q) => q.status === "requested").length;
+  const isApproved = provider.applicationStatus === "approved";
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <PageHeader
         title="Provider Portal"
-        description="Signed in as Marcus Webb · Webb Plumbing Co. · Approved provider since March 2026"
+        description={`Signed in as ${provider.fullName} · ${provider.businessName} · ${provider.email}`}
+        action={
+          <form action={signOutProvider}>
+            <button className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+              Sign out
+            </button>
+          </form>
+        }
       />
 
       {/* Stats */}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Earnings this month" value="$4,320" sub="$1,480 pending in escrow" />
-        <StatCard label="Performance rating" value="4.9 ★" sub="142 completed jobs" />
-        <StatCard label="Acceptance rate" value="87%" sub="Last 90 days" />
-        <StatCard label="Open invitations" value={String(invitations.length)} sub="Respond within 24 hrs to hold your slot" />
+        <StatCard
+          label="Screening status"
+          value={screeningLabels[provider.applicationStatus]}
+          sub={`Application ${provider.applicationReference}`}
+        />
+        <StatCard
+          label="Qualified services"
+          value={String(qualifiedCount)}
+          sub={pendingCount > 0 ? `${pendingCount} awaiting review` : "Request more below"}
+        />
+        <StatCard
+          label="Open invitations"
+          value="0"
+          sub={isApproved ? "You'll be notified when jobs match" : "Unlocks after screening approval"}
+        />
+        <StatCard
+          label="Earnings to date"
+          value={formatCurrency(0)}
+          sub="Payouts land within 2 business days of approval"
+        />
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-3">
@@ -65,41 +80,18 @@ export default function ProviderPortalPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-900">Job invitations</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Jobs matched to your approved qualifications. Scope, photos, and payout are set by Baseline — accept or decline.
+              Jobs matched to your qualified services. Scope, photos, and payout are set by
+              Baseline — accept or decline with no penalty.
             </p>
-            <div className="mt-4 space-y-4">
-              {invitations.map((job) => (
-                <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-slate-900">{job.service}</h3>
-                        <Badge label={job.urgency} />
-                      </div>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {job.id} · {job.location} · Requested for {job.date}
-                      </p>
-                      <p className="mt-2 text-sm text-slate-600">{job.note}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400">Your payout</p>
-                      <p className="text-xl font-semibold tracking-tight text-slate-900">{formatCurrency(job.payout)}</p>
-                      <p className="text-xs text-slate-400">escrowed at acceptance</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
-                    <button className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
-                      Accept Job
-                    </button>
-                    <button className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                      Decline
-                    </button>
-                    <button className="ml-auto text-sm font-semibold text-teal-700 hover:text-teal-800">
-                      View full scope →
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+              <h3 className="font-semibold text-slate-900">
+                {isApproved ? "No invitations yet" : "Invitations unlock after approval"}
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+                {isApproved
+                  ? "When a funded job matches one of your qualified services in your area, it appears here with the scope and payout already set."
+                  : `Your application is in ${screeningLabels[provider.applicationStatus].toLowerCase()}. Once you're approved and qualified for services, matched jobs appear here.`}
+              </p>
             </div>
           </section>
 
@@ -111,62 +103,115 @@ export default function ProviderPortalPage() {
               qualification review before you receive invitations. Providers cannot create or edit
               services — the catalog is owned and maintained by Baseline.
             </p>
-            <div className="mt-4">
-              <ServiceOptIn services={services} initialQualifiedIds={qualifiedIds} />
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Catalog service</th>
+                    <th className="px-4 py-3">Baseline price</th>
+                    <th className="px-4 py-3">Skill level</th>
+                    <th className="px-4 py-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {services.map((s) => {
+                    const status = qualificationByService.get(s.id);
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-900">{s.name}</p>
+                          <p className="text-xs text-slate-400">{s.category}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatCurrency(s.baselinePrice)}{" "}
+                          <span className="text-xs text-slate-400">{s.priceUnit}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{s.skillLevel}</td>
+                        <td className="px-4 py-3 text-right">
+                          {status === "qualified" ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                              ✓ Qualified
+                            </span>
+                          ) : status === "requested" ? (
+                            <form action={withdrawQualification} className="inline">
+                              <input type="hidden" name="serviceId" value={s.id} />
+                              <button className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100">
+                                Pending review · Cancel
+                              </button>
+                            </form>
+                          ) : status === "declined" ? (
+                            <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                              Not approved
+                            </span>
+                          ) : (
+                            <form action={requestQualification} className="inline">
+                              <input type="hidden" name="serviceId" value={s.id} />
+                              <button className="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-inset ring-teal-600/40 hover:bg-teal-50">
+                                + Request qualification
+                              </button>
+                            </form>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {pendingCount > 0 && (
+                <div className="border-t border-slate-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+                  {pendingCount} qualification request{pendingCount > 1 ? "s" : ""} awaiting
+                  Baseline review — expect a decision within 3 business days.
+                </div>
+              )}
             </div>
           </section>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-8">
-          {/* Earnings */}
+          {/* Screening status */}
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="font-semibold text-slate-900">Screening</h2>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Application</dt>
+                <dd className="font-semibold text-slate-900">{provider.applicationReference}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Status</dt>
+                <dd><Badge label={screeningLabels[provider.applicationStatus]} /></dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Portal member since</dt>
+                <dd className="font-semibold text-slate-900">
+                  {provider.memberSince.toLocaleDateString("en-US", { dateStyle: "medium" })}
+                </dd>
+              </div>
+            </dl>
+            {!isApproved && (
+              <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-inset ring-amber-600/20">
+                Screening is still in progress. You can request service qualifications now — they
+                are reviewed once your application is approved.
+              </p>
+            )}
+          </section>
+
+          {/* Payouts */}
           <section className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-900">Recent payouts</h2>
-            <div className="mt-3 divide-y divide-slate-100">
-              {payouts.map((p) => (
-                <div key={p.label} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-900">{p.label}</p>
-                    <p className="text-xs text-slate-400">{p.date}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-slate-900">{formatCurrency(p.amount)}</p>
-                    <Badge label={p.status} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-              Year-to-date earnings: <span className="font-semibold text-slate-900">$28,640</span> ·
-              Payouts land within 2 business days of customer approval.
-            </div>
+            <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+              No payouts yet. Once you complete a milestone and the customer approves it, the
+              escrowed payment lands here within 2 business days.
+            </p>
           </section>
 
           {/* Performance */}
           <section className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-900">Performance</h2>
-            <dl className="mt-3 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Overall rating</dt>
-                <dd className="font-semibold text-slate-900">4.9 / 5.0 ★</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">On-time arrival</dt>
-                <dd className="font-semibold text-slate-900">98%</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">First-visit completion</dt>
-                <dd className="font-semibold text-slate-900">94%</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Rework rate</dt>
-                <dd className="font-semibold text-slate-900">1.4%</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Screening status</dt>
-                <dd><Badge label="Approved" /></dd>
-              </div>
-            </dl>
+            <p className="mt-3 text-sm text-slate-500">
+              Rating, on-time arrival, and first-visit completion metrics build as you complete
+              Baseline jobs.
+            </p>
             <p className="mt-4 rounded-lg bg-teal-50 p-3 text-xs text-teal-800 ring-1 ring-inset ring-teal-600/20">
               Providers rated 4.8+ get first access to Priority and Emergency invitations.
             </p>

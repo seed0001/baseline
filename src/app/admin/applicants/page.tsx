@@ -9,8 +9,10 @@ import {
   type ProviderApplication,
   type ProviderApplicationStatus,
 } from "@/lib/provider-applications";
+import { listProviderAccountApplicationIds } from "@/lib/provider-accounts";
 import { updateApplicantStatus } from "./actions";
 import { PromoteToStaffForm } from "./promote-form";
+import { ProviderAccountPanel } from "./provider-account-form";
 
 export const metadata = {
   title: "Provider Applicants — Baseline Operations",
@@ -33,14 +35,19 @@ const statusLabels: Record<ProviderApplicationStatus, string> = {
 export default async function ProviderApplicantsPage() {
   const viewer = await requireEmployee("applicants.view");
   const canManageEmployees = roleHasPermission(viewer.role, "employees.manage");
+  const canManageProviders = roleHasPermission(viewer.role, "providers.manage");
   let applications: ProviderApplication[] = [];
   let databaseReady = true;
   let staffEmails = new Set<string>();
+  let portalAccountIds = new Set<string>();
 
   try {
     applications = await listProviderApplications();
     if (canManageEmployees) {
       staffEmails = new Set((await listEmployees()).map((e) => e.email.toLowerCase()));
+    }
+    if (canManageProviders) {
+      portalAccountIds = await listProviderAccountApplicationIds();
     }
   } catch {
     databaseReady = false;
@@ -162,6 +169,13 @@ export default async function ProviderApplicantsPage() {
                 Save update
               </button>
             </form>
+
+            {canManageProviders && (
+              <ProviderAccountPanel
+                applicationId={application.id}
+                hasAccount={portalAccountIds.has(application.id)}
+              />
+            )}
 
             {canManageEmployees && !staffEmails.has(application.email.toLowerCase()) && (
               <PromoteToStaffForm applicationId={application.id} roles={promotableRoles} />
