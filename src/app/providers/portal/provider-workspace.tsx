@@ -2,26 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { ProviderActivity, ProviderService, ProviderTool } from "@/lib/provider-workspace";
+import type { ChatMessage } from "@/lib/ai";
+import type { ProviderPersona, ProviderPersonaKey } from "@/lib/provider-personas";
 import { signOutProvider } from "./actions";
-import { generateCatalogDraft, saveCatalogService } from "./workspace-actions";
+import { saveCatalogService } from "./workspace-actions";
+import { ProviderAiTeam } from "./provider-ai-team";
 
 type Tab = "home" | "catalog" | "tools" | "jobs" | "activity";
-
-type VoiceRecognition = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onresult: (event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void;
-  onend: () => void;
-  onerror: () => void;
-};
-
-type VoiceWindow = Window & {
-  SpeechRecognition?: new () => VoiceRecognition;
-  webkitSpeechRecognition?: new () => VoiceRecognition;
-};
 
 type ServiceDraft = Omit<ProviderService, "id" | "updatedAt"> & { id?: string };
 
@@ -34,17 +21,19 @@ export function ProviderWorkspace({
   services: initialServices,
   tools,
   activity,
+  personas,
+  initialHistories,
 }: {
   businessName: string;
   services: ProviderService[];
   tools: ProviderTool[];
   activity: ProviderActivity[];
+  personas: ProviderPersona[];
+  initialHistories: Record<ProviderPersonaKey, ChatMessage[]>;
 }) {
   const [tab, setTab] = useState<Tab>("home");
   const [services, setServices] = useState(initialServices);
-  const [prompt, setPrompt] = useState("");
   const [draft, setDraft] = useState<ServiceDraft | null>(null);
-  const [listening, setListening] = useState(false);
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
   const published = services.filter((service) => service.status === "published").length;
@@ -57,41 +46,6 @@ export function ProviderWorkspace({
     { id: "activity", label: "Activity", icon: "◷" },
   ];
 
-  function listen() {
-    const voiceWindow = window as VoiceWindow;
-    const SpeechRecognition =
-      voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setNotice("Voice input is not available in this browser. You can type the same request.");
-      return;
-    }
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onresult = (event) => setPrompt(event.results[0][0].transcript);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => {
-      setListening(false);
-      setNotice("I couldn't hear that. Try again or type your request.");
-    };
-    setListening(true);
-    recognition.start();
-  }
-
-  function buildDraft() {
-    if (!prompt.trim()) return;
-    startTransition(async () => {
-      try {
-        const generated = await generateCatalogDraft(prompt);
-        setDraft(generated);
-        setNotice("AI draft ready. Review the structured details before saving.");
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "The AI could not build that draft.");
-      }
-    });
-  }
-
   function save(status: "draft" | "published") {
     if (!draft) return;
     startTransition(async () => {
@@ -99,7 +53,6 @@ export function ProviderWorkspace({
         const saved = await saveCatalogService({ ...draft, status });
         setServices((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
         setDraft(null);
-        setPrompt("");
         setNotice(status === "published" ? "Service published to your catalog." : "Draft saved.");
         setTab("catalog");
       } catch (error) {
@@ -147,48 +100,21 @@ export function ProviderWorkspace({
           {notice && <div className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">{notice}</div>}
 
           {tab === "home" && (
-            <div className="space-y-5">
-              <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-900 via-teal-800 to-cyan-700 p-5 text-white shadow-lg sm:p-8">
-                <p className="text-sm text-teal-100">Tell Baseline what you need to build or manage.</p>
-                <h2 className="mt-2 max-w-2xl text-2xl font-semibold sm:text-3xl">What are we working on?</h2>
-                <div className="mt-6 rounded-2xl bg-white p-2 shadow-xl">
-                  <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)}
-                    placeholder="Try: Add a water heater installation service starting at $1,500..."
-                    className="min-h-28 w-full resize-none rounded-xl px-3 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400" />
-                  <div className="flex items-center justify-between gap-2 px-1 pb-1">
-                    <button onClick={listen} type="button"
-                      className={`flex h-12 w-12 items-center justify-center rounded-full text-xl ${listening ? "animate-pulse bg-red-500 text-white" : "bg-slate-100 text-slate-700"}`}
-                      aria-label="Speak your request">●</button>
-                    <button onClick={buildDraft} disabled={!prompt.trim() || pending}
-                      className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white disabled:bg-slate-300">
-                      {pending ? "Building…" : "Build with AI"}
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs text-teal-100">Nothing changes until you review and approve it.</p>
-              </section>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  ["Build a service", "Create scope, intake, photos, and pricing.", "catalog"],
-                  ["Create a business tool", "Start a checklist, form, or calculator.", "tools"],
-                  ["Manage today’s work", "Review customers, jobs, and next actions.", "jobs"],
-                ].map(([heading, body, target]) => (
-                  <button key={heading} onClick={() => target === "catalog" ? setPrompt("Add a new service for ") : setTab(target as Tab)}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-teal-300">
-                    <h3 className="font-semibold text-slate-900">{heading}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{body}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ProviderAiTeam
+              initialPersonas={personas}
+              initialHistories={initialHistories}
+              onDraft={(generated) => {
+                setDraft(generated);
+                setNotice("AI draft ready. Review the structured details before saving.");
+              }}
+            />
           )}
 
           {tab === "catalog" && (
             <section>
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-500">{services.length} services · {published} published</p>
-                <button onClick={() => { setTab("home"); setPrompt("Add a new service for "); }}
+                <button onClick={() => setTab("home")}
                   className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">+ Build service</button>
               </div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">

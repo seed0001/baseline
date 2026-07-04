@@ -117,13 +117,15 @@ export async function askAssistant(input: {
   subjectId: string;
   message: string;
   context?: string;
+  persona?: string;
 }): Promise<string> {
   const conversationId = await ensureConversation(input.audience, input.subjectId);
   const history = await getConversationHistory(input.audience, input.subjectId);
 
+  const basePersona = input.persona ?? personas[input.audience];
   const system = input.context
-    ? `${personas[input.audience]}\n\nCurrent context:\n${input.context}`
-    : personas[input.audience];
+    ? `${basePersona}\n\nCurrent context:\n${input.context}`
+    : basePersona;
 
   const reply = await callOpenRouter([
     { role: "system", content: system },
