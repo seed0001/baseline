@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { ServiceTemplate } from "@/lib/data";
 import { formatCurrency } from "@/lib/data";
+import { regions, regionByCode, indexDeltaLabel } from "@/lib/regions";
 
 const urgencyOptions = [
   { value: "standard", label: "Standard", note: "Next available slot", multiplier: 1 },
@@ -30,6 +31,8 @@ export function QuoteBuilder({
   const [urgency, setUrgency] = useState<(typeof urgencyOptions)[number]["value"]>("standard");
   const [timeline, setTimeline] = useState(timelineOptions[0]);
   const [location, setLocation] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [openToTravel, setOpenToTravel] = useState(false);
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
@@ -38,14 +41,17 @@ export function QuoteBuilder({
     [services, serviceId]
   );
 
+  const region = useMemo(() => (stateCode ? regionByCode(stateCode) ?? null : null), [stateCode]);
+
   const estimate = useMemo(() => {
     if (!service) return null;
     const m = urgencyOptions.find((u) => u.value === urgency)?.multiplier ?? 1;
+    const r = region?.index ?? 1;
     return {
-      low: Math.round(service.baselinePrice * 0.85 * m),
-      high: Math.round(service.baselinePrice * 1.25 * m),
+      low: Math.round(service.baselinePrice * 0.85 * m * r),
+      high: Math.round(service.baselinePrice * 1.25 * m * r),
     };
-  }, [service, urgency]);
+  }, [service, urgency, region]);
 
   if (submitted && service) {
     return (
@@ -129,17 +135,60 @@ export function QuoteBuilder({
         {/* Step 2: Location */}
         <section className="rounded-xl border border-slate-200 bg-white p-6">
           <h2 className="font-semibold text-slate-900">2. Job location</h2>
-          <input
-            type="text"
-            required
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Street address or ZIP code"
-            className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
-          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <select
+              required
+              value={stateCode}
+              onChange={(e) => setStateCode(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+            >
+              <option value="">State…</option>
+              {regions.map((r) => (
+                <option key={r.code} value={r.code}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              required
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Street address or ZIP code"
+              className="sm:col-span-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+            />
+          </div>
           <p className="mt-2 text-xs text-slate-400">
-            Location adjusts baseline pricing for your region.
+            Onsite pricing adjusts to your state&apos;s cost index.{" "}
+            {region ? (
+              <span className="font-medium text-slate-500">
+                {region.name}: ×{region.index.toFixed(2)} ({indexDeltaLabel(region.index)}).
+              </span>
+            ) : (
+              <Link href="/pricing-map" className="font-medium text-teal-700 hover:text-teal-800">
+                See the regional pricing map
+              </Link>
+            )}
           </p>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <input
+              type="checkbox"
+              checked={openToTravel}
+              onChange={(e) => setOpenToTravel(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-slate-900">
+                Invite qualified providers who travel
+              </span>
+              <span className="mt-0.5 block text-slate-600">
+                Include specialists from other states willing to travel for this job. Travel costs
+                (mileage, lodging, logistics) appear as separate line items in their proposals —
+                never hidden in the rate.
+              </span>
+            </span>
+          </label>
         </section>
 
         {/* Step 3: Photos */}
@@ -217,7 +266,7 @@ export function QuoteBuilder({
 
         <button
           type="submit"
-          disabled={!service || !location}
+          disabled={!service || !location || !stateCode}
           className="w-full rounded-lg bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           Submit Quote Request
@@ -257,6 +306,20 @@ export function QuoteBuilder({
                   <span className="text-slate-500">Urgency</span>
                   <span className="font-medium text-slate-900 capitalize">{urgency}</span>
                 </div>
+                {region && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Region</span>
+                    <span className="text-right font-medium text-slate-900">
+                      {region.name} ×{region.index.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {openToTravel && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Provider pool</span>
+                    <span className="text-right font-medium text-slate-900">Local + traveling</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-4">
                   <span className="text-slate-500">Timeline</span>
                   <span className="text-right font-medium text-slate-900">{timeline}</span>
@@ -272,9 +335,15 @@ export function QuoteBuilder({
                     {formatCurrency(estimate.low)} – {formatCurrency(estimate.high)}
                   </p>
                   <p className="mt-1 text-xs text-teal-700">
-                    Based on the baseline average, urgency, and typical job variance. Your firm
-                    proposal may differ after review.
+                    Based on the baseline average, urgency,
+                    {region ? ` the ${region.name} cost index,` : ""} and typical job variance.
+                    Your firm proposal may differ after review.
                   </p>
+                  {openToTravel && (
+                    <p className="mt-2 border-t border-teal-600/20 pt-2 text-xs text-teal-700">
+                      Traveling providers add itemized travel costs on top of this range.
+                    </p>
+                  )}
                 </div>
               )}
             </>
