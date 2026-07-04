@@ -62,10 +62,16 @@ export async function sendProviderMessage(message: string): Promise<string> {
           .join("; ")
       : "none yet";
 
-  return askAssistant({
-    audience: "provider",
-    subjectId: provider.id,
-    message: parsed.data,
-    context: `Provider: ${provider.fullName}, business ${provider.businessName}, application ${provider.applicationReference}, screening status ${provider.applicationStatus}. Service qualifications: ${qualificationSummary}.`,
-  });
+  try {
+    return await askAssistant({
+      audience: "provider",
+      subjectId: provider.id,
+      message: parsed.data,
+      context: `Provider: ${provider.fullName}, business ${provider.businessName}, application ${provider.applicationReference}, screening status ${provider.applicationStatus}. Service qualifications: ${qualificationSummary}.`,
+    });
+  } catch (error) {
+    return error instanceof Error
+      ? `⚠ ${error.message}`
+      : "⚠ The assistant hit an error — please try again.";
+  }
 }

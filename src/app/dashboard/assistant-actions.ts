@@ -31,10 +31,16 @@ export async function sendCustomerMessage(message: string): Promise<string> {
     .map((s) => `${s.name} (${s.category}): ${formatCurrency(s.baselinePrice)} ${s.priceUnit}`)
     .join("; ");
 
-  return askAssistant({
-    audience: "customer",
-    subjectId: visitorId,
-    message: parsed.data,
-    context: `Baseline catalog (baseline average prices, region-adjusted at quote time): ${catalog}`,
-  });
+  try {
+    return await askAssistant({
+      audience: "customer",
+      subjectId: visitorId,
+      message: parsed.data,
+      context: `Baseline catalog (baseline average prices, region-adjusted at quote time): ${catalog}`,
+    });
+  } catch (error) {
+    return error instanceof Error
+      ? `⚠ ${error.message}`
+      : "⚠ The assistant hit an error — please try again.";
+  }
 }

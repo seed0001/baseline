@@ -15,8 +15,26 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function QualificationRequestsPage() {
+const banners: Record<string, { tone: "error" | "success"; text: string }> = {
+  invalid: { tone: "error", text: "That decision could not be read — please try again." },
+  checklist: {
+    tone: "error",
+    text: "All five checklist items must be confirmed before qualifying a provider.",
+  },
+  note: { tone: "error", text: "A note explaining the decline is required — it is shown to the provider." },
+  decided: { tone: "error", text: "That request was already decided by someone else." },
+  qualified: { tone: "success", text: "Provider qualified — the decision and checklist were recorded." },
+  declined: { tone: "success", text: "Request declined — the reason was recorded and shown to the provider." },
+};
+
+export default async function QualificationRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; done?: string }>;
+}) {
   await requireEmployee("providers.manage");
+  const { error, done } = await searchParams;
+  const banner = banners[error ?? done ?? ""] ?? null;
   let requests: PendingQualificationRequest[] = [];
   let databaseReady = true;
   let serviceById = new Map<string, { name: string; category: string; skillLevel: string }>();
@@ -45,6 +63,18 @@ export default async function QualificationRequestsPage() {
           </Link>
         }
       />
+
+      {banner && (
+        <p
+          className={`mt-6 rounded-lg border p-4 text-sm ${
+            banner.tone === "error"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {banner.text}
+        </p>
+      )}
 
       {!databaseReady && (
         <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">

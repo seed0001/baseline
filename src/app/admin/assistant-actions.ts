@@ -31,10 +31,16 @@ export async function sendStaffMessage(message: string): Promise<string> {
     }
   }
 
-  return askAssistant({
-    audience: "staff",
-    subjectId: employee.id,
-    message: parsed.data,
-    context: `Staff member: ${employee.fullName}, role ${roleLabels[employee.role]}. ${workload}`,
-  });
+  try {
+    return await askAssistant({
+      audience: "staff",
+      subjectId: employee.id,
+      message: parsed.data,
+      context: `Staff member: ${employee.fullName}, role ${roleLabels[employee.role]}. ${workload}`,
+    });
+  } catch (error) {
+    return error instanceof Error
+      ? `⚠ ${error.message}`
+      : "⚠ The assistant hit an error — please try again.";
+  }
 }
