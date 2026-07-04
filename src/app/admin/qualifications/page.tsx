@@ -4,6 +4,7 @@ import { requireEmployee } from "@/lib/employee-auth";
 import { getCatalogServices } from "@/lib/catalog";
 import {
   listPendingQualificationRequests,
+  qualificationChecklist,
   type PendingQualificationRequest,
 } from "@/lib/provider-accounts";
 import { decideQualification } from "./actions";
@@ -94,23 +95,55 @@ export default async function QualificationRequestsPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <form action={decideQualification}>
-                    <input type="hidden" name="requestId" value={request.id} />
-                    <input type="hidden" name="decision" value="qualified" />
-                    <button className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
-                      Qualify
-                    </button>
-                  </form>
-                  <form action={decideQualification}>
-                    <input type="hidden" name="requestId" value={request.id} />
-                    <input type="hidden" name="decision" value="declined" />
-                    <button className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50">
-                      Decline
-                    </button>
-                  </form>
-                </div>
               </div>
+
+              <form action={decideQualification} className="mt-5 border-t border-slate-100 pt-4">
+                <input type="hidden" name="requestId" value={request.id} />
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  Qualification review — every item is recorded with your decision
+                </p>
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {qualificationChecklist.map((item) => (
+                    <label
+                      key={item.id}
+                      className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        name={`check_${item.id}`}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                      />
+                      <span className="text-slate-700">{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <textarea
+                  name="note"
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Decision note — what you verified, or why this is being declined (required to decline; shown to the provider if declined)"
+                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    name="decision"
+                    value="qualified"
+                    className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                  >
+                    Qualify
+                  </button>
+                  <button
+                    name="decision"
+                    value="declined"
+                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50"
+                  >
+                    Decline
+                  </button>
+                  <span className="text-xs text-slate-400">
+                    Qualify requires all checklist items confirmed · Decline requires a note
+                  </span>
+                </div>
+              </form>
             </article>
           );
         })}

@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
+import { ChatPanel } from "@/components/chat-panel";
 import { requireEmployee } from "@/lib/employee-auth";
+import { getConversationHistory, type ChatMessage } from "@/lib/ai";
 import {
   roleHasPermission,
   roleLabels,
   rolePermissions,
   type Permission,
 } from "@/lib/permissions";
+import { sendStaffMessage } from "./assistant-actions";
 
 export const metadata = { title: "Operations — Baseline" };
 export const dynamic = "force-dynamic";
@@ -54,6 +57,13 @@ export default async function AdminPage({
     roleHasPermission(employee.role, workspace.permission),
   );
 
+  let assistantHistory: ChatMessage[] = [];
+  try {
+    assistantHistory = await getConversationHistory("staff", employee.id);
+  } catch {
+    assistantHistory = [];
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <PageHeader
@@ -87,6 +97,17 @@ export default async function AdminPage({
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="mt-8">
+        <ChatPanel
+          title="Operations Assistant"
+          subtitle="Ask about qualification reviews, screening stages, or your current workload. Remembers your conversation."
+          placeholder="e.g. Walk me through the checklist for a plumbing qualification…"
+          emptyNote="I can help you review qualification requests against the checklist, draft decision notes, and explain screening policy."
+          initialMessages={assistantHistory}
+          send={sendStaffMessage}
+        />
       </section>
 
       <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">

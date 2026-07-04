@@ -12,7 +12,23 @@ export type ProviderQualification = {
   serviceId: string;
   status: QualificationStatus;
   requestedAt: Date;
+  decisionNote: string | null;
 };
+
+/**
+ * The structured review every qualification decision is checked against.
+ * Stored with the decision so there is always a record of why a provider
+ * was or was not qualified for a service.
+ */
+export const qualificationChecklist = [
+  { id: "credentials", label: "Credentials / licensing verified for this specific service" },
+  { id: "insurance", label: "Insurance coverage confirmed for this type of work" },
+  { id: "experience", label: "Experience or portfolio demonstrates this service" },
+  { id: "screening", label: "Screening (application & background check) is approved" },
+  { id: "concerns", label: "No unresolved disputes, complaints, or capacity concerns" },
+] as const;
+
+export type ChecklistId = (typeof qualificationChecklist)[number]["id"];
 
 function pool() {
   const value = getPool();
@@ -93,7 +109,7 @@ export async function listProviderQualifications(
 ): Promise<ProviderQualification[]> {
   const result = await pool().query(
     `
-      SELECT service_id, status, requested_at
+      SELECT service_id, status, requested_at, decision_note
       FROM provider_service_qualifications
       WHERE provider_account_id = $1
     `,
@@ -103,6 +119,7 @@ export async function listProviderQualifications(
     serviceId: String(row.service_id),
     status: row.status as QualificationStatus,
     requestedAt: new Date(String(row.requested_at)),
+    decisionNote: row.decision_note ? String(row.decision_note) : null,
   }));
 }
 
@@ -145,14 +162,17 @@ export async function decideServiceQualification(input: {
   id: number;
   decision: "qualified" | "declined";
   decidedBy: string;
+  checks: Record<ChecklistId, boolean>;
+  note: string;
 }) {
   const result = await pool().query(
     `
       UPDATE provider_service_qualifications
-      SET status = $2, decided_at = NOW(), decided_by = $3
+      SET status = $2, decided_at = NOW(), decided_by = $3,
+          decision_checks = $4::jsonb, decision_note = NULLIF($5, '')
       WHERE id = $1 AND status = 'requested'
     `,
-    [input.id, input.decision, input.decidedBy],
+    [input.id, input.decision, input.decidedBy, JSON.stringify(input.checks), input.note],
   );
   if (!result.rowCount) throw new Error("Request not found or already decided.");
 }

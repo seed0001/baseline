@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { projects, quoteRequests, formatCurrency, formatDate } from "@/lib/data";
+import { getConversationHistory, type ChatMessage } from "@/lib/ai";
 import { Badge, PageHeader, ProgressBar, StatCard } from "@/components/ui";
+import { ChatPanel } from "@/components/chat-panel";
+import { sendCustomerMessage } from "./assistant-actions";
 
 export const metadata = {
   title: "Customer Dashboard — Baseline",
@@ -21,7 +25,17 @@ const documents = [
   { name: "Demo completion photos (6).zip", size: "8.2 MB", date: "2026-06-24" },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const visitorId = (await cookies()).get("baseline_visitor")?.value;
+  let assistantHistory: ChatMessage[] = [];
+  if (visitorId) {
+    try {
+      assistantHistory = await getConversationHistory("customer", visitorId);
+    } catch {
+      assistantHistory = [];
+    }
+  }
+
   const active = projects.filter((p) => p.status !== "Complete");
   const completed = projects.filter((p) => p.status === "Complete");
   const activeQuotes = quoteRequests.filter(
@@ -192,6 +206,16 @@ export default function DashboardPage() {
 
         {/* Sidebar */}
         <div className="space-y-8">
+          {/* Assistant */}
+          <ChatPanel
+            title="Baseline Assistant"
+            subtitle="Find the right service, understand the pricing evidence, or ask how milestones work."
+            placeholder="e.g. What should a water heater replacement cost?"
+            emptyNote="Ask me about any catalog service, what fair pricing looks like, or how escrowed milestone payments protect you."
+            initialMessages={assistantHistory}
+            send={sendCustomerMessage}
+          />
+
           {/* Pending approvals */}
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
             <h2 className="font-semibold text-slate-900">Pending your approval</h2>

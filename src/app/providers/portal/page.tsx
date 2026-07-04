@@ -3,8 +3,15 @@ import { getCatalogServices } from "@/lib/catalog";
 import { requireProvider } from "@/lib/provider-auth";
 import { listProviderQualifications } from "@/lib/provider-accounts";
 import type { ProviderApplicationStatus } from "@/lib/provider-applications";
+import { getConversationHistory, type ChatMessage } from "@/lib/ai";
 import { Badge, PageHeader, StatCard } from "@/components/ui";
-import { requestQualification, signOutProvider, withdrawQualification } from "./actions";
+import { ChatPanel } from "@/components/chat-panel";
+import {
+  requestQualification,
+  sendProviderMessage,
+  signOutProvider,
+  withdrawQualification,
+} from "./actions";
 
 export const metadata = {
   title: "Provider Portal — Baseline",
@@ -30,6 +37,13 @@ export default async function ProviderPortalPage() {
     getCatalogServices(),
     listProviderQualifications(provider.id),
   ]);
+
+  let assistantHistory: ChatMessage[] = [];
+  try {
+    assistantHistory = await getConversationHistory("provider", provider.id);
+  } catch {
+    assistantHistory = [];
+  }
 
   const qualificationByService = new Map(qualifications.map((q) => [q.serviceId, q.status]));
   const qualifiedCount = qualifications.filter((q) => q.status === "qualified").length;
@@ -115,6 +129,7 @@ export default async function ProviderPortalPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {services.map((s) => {
+                    const qualification = qualifications.find((q) => q.serviceId === s.id);
                     const status = qualificationByService.get(s.id);
                     return (
                       <tr key={s.id} className="hover:bg-slate-50">
@@ -140,8 +155,18 @@ export default async function ProviderPortalPage() {
                               </button>
                             </form>
                           ) : status === "declined" ? (
-                            <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
-                              Not approved
+                            <span
+                              title={qualification?.decisionNote ?? undefined}
+                              className="inline-flex flex-col items-end gap-1"
+                            >
+                              <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                                Not approved
+                              </span>
+                              {qualification?.decisionNote && (
+                                <span className="max-w-56 text-right text-xs text-slate-400">
+                                  {qualification.decisionNote}
+                                </span>
+                              )}
                             </span>
                           ) : (
                             <form action={requestQualification} className="inline">
@@ -169,6 +194,16 @@ export default async function ProviderPortalPage() {
 
         {/* Sidebar */}
         <div className="space-y-8">
+          {/* Assistant */}
+          <ChatPanel
+            title="Provider Assistant"
+            subtitle="Questions about screening, qualifications, or payouts — it knows where you stand."
+            placeholder="e.g. Why is my qualification still pending?"
+            emptyNote="Ask me about your screening progress, how to qualify for more services, or how payouts work."
+            initialMessages={assistantHistory}
+            send={sendProviderMessage}
+          />
+
           {/* Screening status */}
           <section className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-900">Screening</h2>
