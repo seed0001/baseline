@@ -106,6 +106,57 @@ export async function listProviderQualifications(
   }));
 }
 
+export type PendingQualificationRequest = {
+  id: number;
+  serviceId: string;
+  requestedAt: Date;
+  providerName: string;
+  businessName: string;
+  email: string;
+  applicationReference: string;
+  applicationStatus: string;
+};
+
+export async function listPendingQualificationRequests(): Promise<PendingQualificationRequest[]> {
+  const result = await pool().query(
+    `
+      SELECT q.id, q.service_id, q.requested_at,
+             p.full_name, p.business_name, p.email, p.reference, p.status AS application_status
+      FROM provider_service_qualifications q
+      JOIN provider_accounts a ON a.id = q.provider_account_id
+      JOIN provider_applications p ON p.id = a.application_id
+      WHERE q.status = 'requested'
+      ORDER BY q.requested_at ASC
+    `,
+  );
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    serviceId: String(row.service_id),
+    requestedAt: new Date(String(row.requested_at)),
+    providerName: String(row.full_name),
+    businessName: String(row.business_name),
+    email: String(row.email),
+    applicationReference: String(row.reference),
+    applicationStatus: String(row.application_status),
+  }));
+}
+
+export async function decideServiceQualification(input: {
+  id: number;
+  decision: "qualified" | "declined";
+  decidedBy: string;
+}) {
+  const result = await pool().query(
+    `
+      UPDATE provider_service_qualifications
+      SET status = $2, decided_at = NOW(), decided_by = $3
+      WHERE id = $1 AND status = 'requested'
+    `,
+    [input.id, input.decision, input.decidedBy],
+  );
+  if (!result.rowCount) throw new Error("Request not found or already decided.");
+}
+
 export async function requestServiceQualification(providerAccountId: string, serviceId: string) {
   await pool().query(
     `

@@ -15,6 +15,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             {roleHasPermission(employee.role, "applicants.view") && (
               <Link href="/admin/applicants" className="text-slate-300 hover:text-white">Applicants</Link>
             )}
+            {roleHasPermission(employee.role, "providers.manage") && (
+              <Link href="/admin/qualifications" className="text-slate-300 hover:text-white">Qualifications</Link>
+            )}
             {roleHasPermission(employee.role, "employees.view") && (
               <Link href="/admin/employees" className="text-slate-300 hover:text-white">Employees</Link>
             )}
