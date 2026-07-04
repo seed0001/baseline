@@ -133,7 +133,7 @@ export function ProviderAiTeam({
   return (
     <div className="space-y-3">
       {notice && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{notice}</div>}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Your AI team</p>
@@ -153,7 +153,7 @@ export function ProviderAiTeam({
             <button
               key={item.key}
               onClick={() => { setSelectedKey(item.key); setMode("chat"); setNotice(""); setConfirmClear(false); }}
-              className={`rounded-xl border p-2.5 text-left transition ${selectedKey === item.key ? "border-teal-600 bg-teal-50 ring-1 ring-teal-600" : "border-slate-200 hover:border-slate-300"}`}
+              className={`rounded-lg border p-2.5 text-left transition ${selectedKey === item.key ? "border-teal-600 bg-teal-50 ring-1 ring-teal-600" : "border-slate-200 hover:border-slate-300"}`}
             >
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-sm shadow-sm">{item.key === "manager" ? "◎" : item.key === "finance" ? "$" : item.key === "marketing" ? "◇" : "↗"}</span>
@@ -165,7 +165,7 @@ export function ProviderAiTeam({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-teal-900 via-teal-800 to-cyan-700 text-white shadow-md">
+      <section className="overflow-hidden rounded-lg bg-gradient-to-br from-teal-900 via-teal-800 to-cyan-700 text-white shadow-md">
         <div className="flex items-start justify-between gap-3 border-b border-white/15 px-4 py-3.5 sm:px-5">
           <div>
             <p className="font-semibold">{persona.displayName}</p>
@@ -187,7 +187,7 @@ export function ProviderAiTeam({
             )}
           </div>
         </div>
-        <div className="max-h-80 min-h-44 space-y-2.5 overflow-y-auto bg-slate-50 p-3 sm:p-4">
+        <div className="max-h-[32rem] min-h-72 space-y-2.5 overflow-y-auto bg-slate-50 p-3 sm:p-4">
           {messages.length === 0 && (
             <div className="rounded-xl bg-white p-3 text-sm text-slate-600 shadow-sm">
               {mode === "chat"

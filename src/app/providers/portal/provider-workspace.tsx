@@ -75,7 +75,7 @@ export function ProviderWorkspace({
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 lg:pb-5">
       <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-5">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3 sm:px-6">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Provider workspace</p>
             <h1 className="mt-0.5 text-lg font-semibold text-slate-950">{title}</h1>
@@ -87,9 +87,9 @@ export function ProviderWorkspace({
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-4 sm:px-5 lg:grid-cols-[190px_1fr]">
+      <div className="mx-auto grid max-w-[1600px] gap-5 px-4 py-4 sm:px-6 lg:grid-cols-[210px_1fr]">
         <aside className="hidden lg:block">
-          <nav className="space-y-1 rounded-xl border border-slate-200 bg-white p-1.5">
+          <nav className="space-y-1 rounded-lg border border-slate-200 bg-white p-1.5">
             {navigation.map((item) => (
               <button key={item.id} onClick={() => setTab(item.id)}
                 className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium ${tab === item.id ? "bg-teal-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
