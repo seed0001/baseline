@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { requireEmployee } from "@/lib/employee-auth";
+import { listEmployees } from "@/lib/employees";
+import { employeeRoles, roleHasPermission, roleLabels } from "@/lib/permissions";
 import {
   listProviderApplications,
   providerApplicationStatuses,
@@ -8,6 +10,7 @@ import {
   type ProviderApplicationStatus,
 } from "@/lib/provider-applications";
 import { updateApplicantStatus } from "./actions";
+import { PromoteToStaffForm } from "./promote-form";
 
 export const metadata = {
   title: "Provider Applicants — Baseline Operations",
@@ -28,15 +31,24 @@ const statusLabels: Record<ProviderApplicationStatus, string> = {
 };
 
 export default async function ProviderApplicantsPage() {
-  await requireEmployee("applicants.view");
+  const viewer = await requireEmployee("applicants.view");
+  const canManageEmployees = roleHasPermission(viewer.role, "employees.manage");
   let applications: ProviderApplication[] = [];
   let databaseReady = true;
+  let staffEmails = new Set<string>();
 
   try {
     applications = await listProviderApplications();
+    if (canManageEmployees) {
+      staffEmails = new Set((await listEmployees()).map((e) => e.email.toLowerCase()));
+    }
   } catch {
     databaseReady = false;
   }
+
+  const promotableRoles = employeeRoles
+    .filter((role) => role !== "owner" || viewer.role === "owner")
+    .map((role) => ({ value: role, label: roleLabels[role] }));
 
   const activeCount = applications.filter(
     (application) => !["approved", "declined", "withdrawn"].includes(application.status),
@@ -80,6 +92,11 @@ export default async function ProviderApplicantsPage() {
                   <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700">
                     {statusLabels[application.status]}
                   </span>
+                  {staffEmails.has(application.email.toLowerCase()) && (
+                    <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-medium text-white">
+                      Staff member
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-sm text-slate-600">{application.businessName}</p>
                 <p className="mt-1 text-xs text-slate-400">
@@ -145,6 +162,10 @@ export default async function ProviderApplicantsPage() {
                 Save update
               </button>
             </form>
+
+            {canManageEmployees && !staffEmails.has(application.email.toLowerCase()) && (
+              <PromoteToStaffForm applicationId={application.id} roles={promotableRoles} />
+            )}
           </article>
         ))}
       </div>

@@ -121,6 +121,29 @@ export async function createProviderApplication(input: ProviderApplicationInput)
   }
 }
 
+export async function getProviderApplication(id: string) {
+  const result = await requirePool().query(
+    "SELECT * FROM provider_applications WHERE id = $1 LIMIT 1",
+    [id],
+  );
+  return result.rowCount ? mapApplication(result.rows[0]) : null;
+}
+
+export async function recordProviderApplicationEvent(
+  applicationId: string,
+  eventType: string,
+  note: string,
+  actor: string,
+) {
+  await requirePool().query(
+    `
+      INSERT INTO provider_application_events (application_id, event_type, note, actor)
+      VALUES ($1, $2, $3, $4)
+    `,
+    [applicationId, eventType, note || null, actor],
+  );
+}
+
 export async function listProviderApplications() {
   const result = await requirePool().query(
     "SELECT * FROM provider_applications ORDER BY submitted_at DESC",
